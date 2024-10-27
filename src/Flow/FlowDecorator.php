@@ -32,11 +32,6 @@ abstract class FlowDecorator implements FlowInterface
         return $this->flow->fn($flow);
     }
 
-    public static function do(callable $callable, ?array $config = null): FlowInterface
-    {
-        return Flow::do($callable, $config);
-    }
-
     public function await(): void
     {
         $this->flow->await();

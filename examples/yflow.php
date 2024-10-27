@@ -11,8 +11,8 @@ use Flow\Driver\ReactDriver;
 use Flow\Driver\SpatieDriver;
 use Flow\Driver\SwooleDriver;
 use Flow\Examples\Model\YFlowData;
-use Flow\Flow\Flow;
 use Flow\Flow\YFlow;
+use Flow\FlowFactory;
 use Flow\Ip;
 use Flow\Job\YJob;
 use Flow\JobInterface;
@@ -194,7 +194,7 @@ $fibonacciYJobDeferAfter = static function ($args) {
     });
 };
 
-$flow = Flow::do(static function () use (
+$flow = (new FlowFactory())->create(static function () use (
     $factorialJob,
     $factorialYJobBefore,
     $factorialYJob,

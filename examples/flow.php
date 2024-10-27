@@ -14,7 +14,7 @@ use Flow\Examples\Model\DataB;
 use Flow\Examples\Model\DataC;
 use Flow\Examples\Model\DataD;
 use Flow\ExceptionInterface;
-use Flow\Flow\Flow;
+use Flow\FlowFactory;
 use Flow\Ip;
 use Flow\IpStrategy\MaxIpStrategy;
 use Flow\Job\ClosureJob;
@@ -92,7 +92,7 @@ echo "begin - synchronous\n";
 $asyncTask = static function ($job1, $job2, $job3, $errorJob1, $errorJob2, $driver) {
     echo "begin - flow asynchronous\n";
 
-    $flow = Flow::do(static function () use ($job1, $job2, $job3, $errorJob1, $errorJob2) {
+    $flow = (new FlowFactory())->create(static function () use ($job1, $job2, $job3, $errorJob1, $errorJob2) {
         yield [$job1, $errorJob1, new MaxIpStrategy(2)];
         yield [$job2, $errorJob2, new MaxIpStrategy(2)];
         yield $job3;

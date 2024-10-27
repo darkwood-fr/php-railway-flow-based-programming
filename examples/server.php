@@ -12,8 +12,8 @@ use Flow\Driver\SpatieDriver;
 use Flow\Driver\SwooleDriver;
 use Flow\Examples\Transport\DoctrineIpTransport;
 use Flow\ExceptionInterface;
-use Flow\Flow\Flow;
 use Flow\Flow\TransportFlow;
+use Flow\FlowFactory;
 use Flow\Ip;
 use Flow\IpStrategy\MaxIpStrategy;
 use Symfony\Component\Messenger\Envelope;
@@ -74,7 +74,7 @@ $errorJob = static function (ExceptionInterface $exception): void {
     printf("%s\n", $exception->getMessage());
 };
 
-$flow = Flow::do(static function () use ($addOneJob, $multbyTwoJob, $minusThreeJob, $errorJob) {
+$flow = (new FlowFactory())->create(static function () use ($addOneJob, $multbyTwoJob, $minusThreeJob, $errorJob) {
     yield [$addOneJob, $errorJob, new MaxIpStrategy(1)];
     yield [$multbyTwoJob, $errorJob, new MaxIpStrategy(3)];
     yield [$minusThreeJob, $errorJob, new MaxIpStrategy(2)];
