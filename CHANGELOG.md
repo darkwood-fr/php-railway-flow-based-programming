@@ -6,6 +6,7 @@
 - Add `Flow\IpPool` for managing pools of Ips.
 - Update `Flow\Event\PullEvent` to pull multiple Ips instead one.
 - Move `Flow::do` to `FlowFactory::create`
+- Add `Flow\Driver\ParallelDriver`
 
 ## v1.2.2
 

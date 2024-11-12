@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.6.0
 
-FROM php:8.3-fpm-alpine as php
+#FROM php:8.3-fpm-alpine as php
+FROM php:8.3-zts-alpine as php
 
 RUN apk add --update make curl
 
@@ -18,8 +19,10 @@ RUN set -eux; \
         pcntl \
         pcov \
 		zip \
+        parallel \
     ;
 
 WORKDIR /flow
 
-CMD ["php-fpm"]
+#CMD ["php-fpm"]
+CMD ["tail", "-f", "/dev/null"]
