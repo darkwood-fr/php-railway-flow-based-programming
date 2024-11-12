@@ -55,18 +55,18 @@ class FiberDriver implements DriverInterface
         $fiber = new Fiber(static function () use ($callback) {
             try {
                 $callback(static function ($result) {
-                    Fiber::suspend($result);
+                    return $result;
                 }, static function ($fn, $next) {
                     $fn($next);
                 });
             } catch (Throwable $exception) {
-                Fiber::suspend(new RuntimeException($exception->getMessage(), $exception->getCode(), $exception));
+                return new RuntimeException($exception->getMessage(), $exception->getCode(), $exception);
             }
         });
 
         $fiber->start();
 
-        return $fiber->resume();
+        return $fiber;
     }
 
     public function await(array &$stream): void
