@@ -7,6 +7,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Flow\AsyncHandler\DeferAsyncHandler;
 use Flow\Driver\AmpDriver;
 use Flow\Driver\FiberDriver;
+use Flow\Driver\ParallelDriver;
 use Flow\Driver\ReactDriver;
 use Flow\Driver\SpatieDriver;
 use Flow\Driver\SwooleDriver;
@@ -23,7 +24,9 @@ $driver = match (random_int(1, 4)) {
     3 => new FiberDriver(),
     4 => new SwooleDriver(),
     // 5 => new SpatieDriver(),
+    // 6 => new ParallelDriver(),
 };
+
 printf("Use %s\n", $driver::class);
 
 $factorial = static function (int $n) use (&$factorial): int {

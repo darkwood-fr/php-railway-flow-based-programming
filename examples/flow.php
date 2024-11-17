@@ -6,6 +6,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Flow\Driver\AmpDriver;
 use Flow\Driver\FiberDriver;
+use Flow\Driver\ParallelDriver;
 use Flow\Driver\ReactDriver;
 use Flow\Driver\SpatieDriver;
 use Flow\Driver\SwooleDriver;
@@ -25,6 +26,7 @@ $driver = match (random_int(1, 4)) {
     3 => new ReactDriver(),
     4 => new SwooleDriver(),
     // 5 => new SpatieDriver(),
+    // 6 => new ParallelDriver(),
 };
 printf("Use %s\n", $driver::class);
 printf("Calculating:\n");
