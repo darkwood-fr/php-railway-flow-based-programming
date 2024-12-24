@@ -14,6 +14,7 @@ use Flow\Driver\ReactDriver;
 use Flow\DriverInterface;
 use Flow\ExceptionInterface;
 use Flow\Flow\Flow;
+use Flow\FlowFactory;
 use Flow\Ip;
 use Flow\IpStrategy\MaxIpStrategy;
 use Flow\Job\ClosureJob;
@@ -124,7 +125,7 @@ class FlowTest extends TestCase
     public function testDo(DriverInterface $driver, callable $callable, ?array $config, int $resultNumber): void
     {
         $ip = new Ip(new ArrayObject(['number' => 0]));
-        $flow = Flow::do($callable, [
+        $flow = (new FlowFactory())->create($callable, [
             ...['driver' => $driver],
             ...($config ?? []),
         ])->fn(static function (ArrayObject $data) use ($resultNumber) {

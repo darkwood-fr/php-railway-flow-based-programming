@@ -2,12 +2,9 @@
 
 declare(strict_types=1);
 
-declare(ticks=1000);
-
 namespace Flow\Driver;
 
 use Closure;
-use Fiber;
 use Flow\DriverInterface;
 use Flow\Event;
 use Flow\Event\AsyncEvent;
@@ -17,6 +14,8 @@ use Flow\Event\PushEvent;
 use Flow\Exception\RuntimeException;
 use Flow\Ip;
 use Flow\JobInterface;
+use parallel\Runtime;
+use RuntimeException as NativeRuntimeException;
 use Throwable;
 
 use function array_key_exists;
@@ -28,7 +27,7 @@ use function count;
  *
  * @implements DriverInterface<TArgs,TReturn>
  */
-class FiberDriver implements DriverInterface
+class ParallelDriver implements DriverInterface
 {
     use DriverTrait;
 
@@ -37,10 +36,19 @@ class FiberDriver implements DriverInterface
      */
     private array $ticks = [];
 
+    public function __construct()
+    {
+        if (!class_exists(Runtime::class)) {
+            throw new NativeRuntimeException('Parallel extension is not loaded. Suggest install it with pecl install parallel');
+        }
+    }
+
     public function async(Closure|JobInterface $callback): Closure
     {
         return static function (...$args) use ($callback) {
-            return new Fiber(static function () use ($callback, $args) {
+            $runtime = new Runtime('vendor/autoload.php');
+
+            return $runtime->run(static function () use ($callback, $args) {
                 try {
                     return $callback(...$args);
                 } catch (Throwable $exception) {
@@ -52,37 +60,40 @@ class FiberDriver implements DriverInterface
 
     public function defer(Closure $callback): mixed
     {
-        $fiber = new Fiber(static function () use ($callback) {
+        $runtime = new Runtime('vendor/autoload.php');
+
+        return $runtime->run(static function () use ($callback) {
             try {
-                $callback(static function ($result) {
-                    Fiber::suspend($result);
-                }, static function ($fn, $next) {
-                    $fn($next);
-                });
+                $result = null;
+                $callback(
+                    static function ($value) use (&$result) {
+                        $result = $value;
+                    },
+                    static function ($fn, $next) {
+                        $fn($next);
+                    }
+                );
+
+                return $result;
             } catch (Throwable $exception) {
-                Fiber::suspend(new RuntimeException($exception->getMessage(), $exception->getCode(), $exception));
+                return new RuntimeException($exception->getMessage(), $exception->getCode(), $exception);
             }
         });
-
-        $fiber->start();
-
-        return $fiber->resume();
     }
 
     public function await(array &$stream): void
     {
-        $async = function ($isTick) use (&$fiberDatas) {
-            return function (Closure|JobInterface $job) use (&$fiberDatas, $isTick) {
-                return function (mixed $data) use (&$fiberDatas, $isTick, $job) {
+        $async = function ($isTick) use (&$parallelDatas) {
+            return function (Closure|JobInterface $job) use (&$parallelDatas, $isTick) {
+                return function (mixed $data) use (&$parallelDatas, $isTick, $job) {
                     $async = $this->async($job);
 
-                    $fiber = $async($data);
-                    $fiber->start();
+                    $parallel = $async($data);
 
                     $next = static function ($return) {};
 
-                    $fiberDatas[] = [
-                        'fiber' => $fiber,
+                    $parallelDatas[] = [
+                        'parallel' => $parallel,
                         'next' => static function ($return) use (&$next) {
                             $next($return);
                         },
@@ -99,10 +110,11 @@ class FiberDriver implements DriverInterface
             };
         };
 
-        $defer = static function ($isTick) use (&$fiberDatas) {
-            return static function (Closure|JobInterface $job) use ($isTick, &$fiberDatas) {
-                return static function (Closure $next) use ($isTick, $job, &$fiberDatas) {
-                    $fiber = new Fiber(static function () use ($isTick, $job, $next) {
+        $defer = static function ($isTick) use (&$parallelDatas) {
+            return static function (Closure|JobInterface $job) use ($isTick, &$parallelDatas) {
+                return static function (Closure $next) use ($isTick, $job, &$parallelDatas) {
+                    $parallel = new Runtime('vendor/autoload.php');
+                    $parallel->run(static function () use ($isTick, $job, $next) {
                         try {
                             $job(static function ($return) use ($isTick, $next) {
                                 if ($isTick === false) {
@@ -116,10 +128,8 @@ class FiberDriver implements DriverInterface
                         }
                     });
 
-                    $fiber->start();
-
-                    $fiberDatas[] = [
-                        'fiber' => $fiber,
+                    $parallelDatas[] = [
+                        'parallel' => $parallel,
                         'next' => static function ($return) {}, /*function ($return) use ($isTick, $next) {
                             if ($isTick === false) {
                                 $next($return);
@@ -131,7 +141,7 @@ class FiberDriver implements DriverInterface
         };
 
         $tick = 0;
-        $fiberDatas = [];
+        $parallelDatas = [];
         do {
             foreach ($this->ticks as [
                 'interval' => $interval,
@@ -163,13 +173,11 @@ class FiberDriver implements DriverInterface
                 }
             }
 
-            foreach ($fiberDatas as $i => $fiberData) { // @phpstan-ignore-line see https://github.com/phpstan/phpstan/issues/11468
-                if (!$fiberData['fiber']->isTerminated() and $fiberData['fiber']->isSuspended()) {
-                    $fiberData['fiber']->resume();
-                } else {
-                    $data = $fiberData['fiber']->getReturn();
-                    $fiberData['next']($data);
-                    unset($fiberDatas[$i]);
+            foreach ($parallelDatas as $i => $parallelData) { // @phpstan-ignore-line see https://github.com/phpstan/phpstan/issues/11468
+                if ($parallelData['parallel']->done()) {
+                    $data = $parallelData['parallel']->value();
+                    $parallelData['next']($data);
+                    unset($parallelDatas[$i]);
                 }
             }
 
@@ -179,10 +187,7 @@ class FiberDriver implements DriverInterface
 
     public function delay(float $seconds): void
     {
-        $date = time();
-        do {
-            Fiber::suspend();
-        } while (time() - $date < $seconds);
+        sleep((int) $seconds);
     }
 
     public function tick($interval, Closure $callback): Closure

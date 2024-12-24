@@ -72,6 +72,16 @@ pecl install openswoole-22.0.0
 
 More documentation can be found [https://openswoole.com](https://openswoole.com)
 
+## Parallel Driver
+
+To use Parallel Driver, you have to require the library with PECL
+
+```bash
+pecl install parallel
+```
+
+More documentation can be found [https://www.php.net/manual/en/book.parallel.php](https://www.php.net/manual/en/book.parallel.php)
+
 ## Make your custom driver
 
 You can make your custom driver by implementing `Flow\DriverInterface`

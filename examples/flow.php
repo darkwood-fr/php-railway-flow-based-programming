@@ -6,6 +6,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Flow\Driver\AmpDriver;
 use Flow\Driver\FiberDriver;
+use Flow\Driver\ParallelDriver;
 use Flow\Driver\ReactDriver;
 use Flow\Driver\SpatieDriver;
 use Flow\Driver\SwooleDriver;
@@ -14,7 +15,7 @@ use Flow\Examples\Model\DataB;
 use Flow\Examples\Model\DataC;
 use Flow\Examples\Model\DataD;
 use Flow\ExceptionInterface;
-use Flow\Flow\Flow;
+use Flow\FlowFactory;
 use Flow\Ip;
 use Flow\IpStrategy\MaxIpStrategy;
 use Flow\Job\ClosureJob;
@@ -25,6 +26,7 @@ $driver = match (random_int(1, 4)) {
     3 => new ReactDriver(),
     4 => new SwooleDriver(),
     // 5 => new SpatieDriver(),
+    // 6 => new ParallelDriver(),
 };
 printf("Use %s\n", $driver::class);
 printf("Calculating:\n");
@@ -35,7 +37,7 @@ printf("- DataC(f)\n");
 $job1 = static function (DataA $dataA) use ($driver): DataB {
     printf("*. #%d - Job 1 Calculating %d + %d\n", $dataA->id, $dataA->a, $dataA->b);
 
-    // simulating calculating some "light" operation from 0.1 to 1 seconds
+    // simulating calculating some "light" operation from 1 to 3 seconds
     $delay = random_int(1, 3);
     $driver->delay($delay);
     $d = $dataA->a + $dataA->b;
@@ -92,7 +94,7 @@ echo "begin - synchronous\n";
 $asyncTask = static function ($job1, $job2, $job3, $errorJob1, $errorJob2, $driver) {
     echo "begin - flow asynchronous\n";
 
-    $flow = Flow::do(static function () use ($job1, $job2, $job3, $errorJob1, $errorJob2) {
+    $flow = (new FlowFactory())->create(static function () use ($job1, $job2, $job3, $errorJob1, $errorJob2) {
         yield [$job1, $errorJob1, new MaxIpStrategy(2)];
         yield [$job2, $errorJob2, new MaxIpStrategy(2)];
         yield $job3;

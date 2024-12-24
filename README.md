@@ -27,6 +27,7 @@ composer require darkwood/flow
 <?php
 
 use Flow\Flow\Flow;
+use Flow\FlowFactory;
 use Flow\Ip;
 
 class D1 {
@@ -45,7 +46,7 @@ class D4 {
     public function __construct(public int $n4) {}
 }
 
-$flow = Flow::do(static function() {
+$flow = (new FlowFactory())->create(static function() {
     yield fn (D1 $data1) => new D2($data1->n1 += 1);
     yield fn (D2 $data2) => new D3($data2->n2 * 2);
     yield function(D3 $data3) {
