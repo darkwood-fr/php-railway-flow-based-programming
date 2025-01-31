@@ -56,7 +56,7 @@ class LambdaJob implements JobInterface
             }
 
             // Match identifiers
-            if (preg_match('/^[a-z]+/', $expression->slice($position)->toString(), $matches)) {
+            if (preg_match('/^[a-z]/', $expression->slice($position)->toString(), $matches)) {
                 $tokens[] = ['type' => 'identifier', 'value' => $matches[0]];
                 $position += strlen($matches[0]);
                 continue;
@@ -104,17 +104,30 @@ class LambdaJob implements JobInterface
             }
 
             // Try lambda
-            if ($position + 3 < $length &&
-                $tokens[$position]['type'] === 'lambda' &&
-                $tokens[$position + 1]['type'] === 'identifier' &&
-                $tokens[$position + 2]['type'] === 'dot') {
-                
+            if ($tokens[$position]['type'] === 'lambda') {
                 $position++; // skip lambda
-                $var = $tokens[$position]['value'];
-                $position += 2; // skip var and dot
+                $vars = [];
                 
+                // Collect all identifiers until we hit a dot
+                while ($position < $length && $tokens[$position]['type'] === 'identifier') {
+                    $vars[] = $tokens[$position]['value'];
+                    $position++;
+                }
+                
+                if ($position >= $length || $tokens[$position]['type'] !== 'dot') {
+                    throw new \RuntimeException('Expected dot after lambda parameters');
+                }
+                $position++; // skip dot
+                
+                // Parse the body expression
                 $expr = $parseExpr();
-                return ['λ', $var, $expr];
+                
+                // Build nested lambda expressions for multiple variables
+                $result = $expr;
+                for ($i = count($vars) - 1; $i >= 0; $i--) {
+                    $result = ['λ', $vars[$i], $result];
+                }
+                return $result;
             }
 
             // Try application
