@@ -33,7 +33,8 @@ $driver = match (random_int(3, 3)) {
 //$job = new \Flow\Job\LambdaJob('λab.a(b)');
 //$job = new \Flow\Job\LambdaJob('λabcd.a(b(c(d)))');
 
-$job = new \Flow\Job\LambdaJob('λf.(λx.f (x x)) (λx.f (x x))');
+//$job = new \Flow\Job\LambdaJob('(λy.(λu.y λx.(u u)) ((λx.λu.x (λy.y (x z))) λu.((x x) λu.y)))');
+$job = new \Flow\Job\LambdaJob('(λf.(λx.f (x x)) (λx.f (x x)))');
 
 $result = $job(5);
 dd($result);

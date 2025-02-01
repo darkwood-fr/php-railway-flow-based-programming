@@ -29,6 +29,7 @@ class LambdaJob implements JobInterface
             
         $tokens = $this->tokenize($expr);
         $ast = $this->parse($tokens);
+        dd($ast);
         $lambda = $this->evaluate($ast);
         dd($lambda);
 
@@ -41,7 +42,6 @@ class LambdaJob implements JobInterface
         $length = $expression->length();
 
         while ($position < $length) {
-
             // Skip whitespace
             if (preg_match('/\s/', $expression->slice($position, 1)->toString())) {
                 $position++;
@@ -55,34 +55,24 @@ class LambdaJob implements JobInterface
                 continue;
             }
 
-            // Match identifiers
-            if (preg_match('/^[a-z]/', $expression->slice($position)->toString(), $matches)) {
-                $tokens[] = ['type' => 'identifier', 'value' => $matches[0]];
+            // Match variables (single letters with optional subscript numbers)
+            if (preg_match('/^([a-z])(\d+)?/i', $expression->slice($position)->toString(), $matches)) {
+                $tokens[] = ['type' => 'var', 'value' => $matches[0]];
                 $position += strlen($matches[0]);
                 continue;
             }
 
-            // Match dot
-            if ($expression->slice($position, 1)->toString() === '.') {
-                $tokens[] = ['type' => 'dot', 'value' => '.'];
+            // Match dot and parentheses
+            $symbols = ['.', '(', ')'];
+            $types = ['dot', 'lparen', 'rparen'];
+            $char = $expression->slice($position, 1)->toString();
+            $index = array_search($char, $symbols);
+            if ($index !== false) {
+                $tokens[] = ['type' => $types[$index], 'value' => $char];
                 $position++;
                 continue;
             }
 
-            // Match parentheses
-            if ($expression->slice($position, 1)->toString() === '(') {
-                $tokens[] = ['type' => 'lparen', 'value' => '('];
-                $position++;
-                continue;
-            }
-
-            if ($expression->slice($position, 1)->toString() === ')') {
-                $tokens[] = ['type' => 'rparen', 'value' => ')'];
-                $position++;
-                continue;
-            }
-
-            // Invalid character
             throw new \RuntimeException(sprintf(
                 'Unexpected character "%s" at position %d',
                 $expression->slice($position, 1)->toString(),
@@ -103,66 +93,41 @@ class LambdaJob implements JobInterface
                 throw new \RuntimeException('Unexpected end of input');
             }
 
-            // Handle lambda abstraction (λx.y. body)
-            if ($tokens[$position]['type'] === 'lambda') {
-                $position++; // Skip 'λ'
-                $params = [];
-
-                // Collect parameter names separated by dots
-                do {
-                    if ($position >= $length || $tokens[$position]['type'] !== 'identifier') {
-                        throw new \RuntimeException('Expected identifier after lambda or dot');
-                    }
-                    $params[] = $tokens[$position]['value'];
-                    $position++;
-
-                    // Check for dot separator
-                    if ($position < $length && $tokens[$position]['type'] === 'dot') {
-                        $position++; // Skip '.'
-                    } else {
-                        break;
-                    }
-                } while ($position < $length);
-
-                // Parse function body
-                $body = $parseExpr();
-
-                // Construct nested lambda expressions
-                foreach (array_reverse($params) as $param) {
-                    $body = ['λ', $param, $body];
-                }
-
-                return $body;
+            // Handle variables
+            if ($tokens[$position]['type'] === 'var') {
+                return $tokens[$position++]['value'];
             }
 
-            // Handle function application (e.g. (λx. x) (λy. y))
+            // Handle lambda abstraction (λx.body)
+            if ($tokens[$position]['type'] === 'lambda') {
+                $position++; // Skip 'λ'
+                
+                if ($position >= $length || $tokens[$position]['type'] !== 'var') {
+                    throw new \RuntimeException('Expected variable after lambda');
+                }
+                $param = $tokens[$position++]['value'];
+                
+                if ($position >= $length || $tokens[$position]['type'] !== 'dot') {
+                    throw new \RuntimeException('Expected dot after parameter');
+                }
+                $position++; // Skip '.'
+                
+                $body = $parseExpr();
+                return ['λ', $param, $body];
+            }
+
+            // Handle application ((e1 e2))
             if ($tokens[$position]['type'] === 'lparen') {
                 $position++; // Skip '('
-                $expressions = [];
-
-                while ($position < $length && $tokens[$position]['type'] !== 'rparen') {
-                    $expressions[] = $parseExpr();
-                }
-
+                $e1 = $parseExpr();
+                $e2 = $parseExpr();
+                
                 if ($position >= $length || $tokens[$position]['type'] !== 'rparen') {
                     throw new \RuntimeException('Expected closing parenthesis');
                 }
                 $position++; // Skip ')'
-
-                // Handle multiple applications (e.g. (λx. x) (λy. y))
-                $expr = array_shift($expressions);
-                while (!empty($expressions)) {
-                    $expr = [$expr, array_shift($expressions)];
-                }
-
-                return $expr;
-            }
-
-            // Handle identifiers (variables, function names)
-            if ($tokens[$position]['type'] === 'identifier') {
-                $expr = $tokens[$position]['value'];
-                $position++;
-                return $expr;
+                
+                return ['app', $e1, $e2];
             }
 
             throw new \RuntimeException(sprintf(
@@ -174,9 +139,8 @@ class LambdaJob implements JobInterface
 
         $ast = $parseExpr();
 
-        // Ensure all tokens have been consumed
         if ($position < $length) {
-            throw new \RuntimeException(sprintf('Unexpected tokens after expression at position %d', $position));
+            throw new \RuntimeException('Unexpected tokens after expression');
         }
 
         return $ast;
@@ -184,36 +148,34 @@ class LambdaJob implements JobInterface
 
     private function evaluate($exp, array $env = []): mixed
     {
-        // Handle primitives and callables
-        if (is_int($exp) || is_float($exp) || is_bool($exp) || (is_object($exp) && is_callable($exp))) {
-            return $exp;
-        }
-
-        // Handle variable lookup
+        // Variable reference
         if (is_string($exp)) {
+            if (!isset($env[$exp])) {
+                throw new \RuntimeException("Unbound variable: $exp");
+            }
             return $env[$exp];
         }
 
-        // Handle lambda abstraction
+        // Lambda abstraction
         if ($exp[0] === 'λ') {
-            [$_, $arg, $body] = $exp;
-            return ['closure', $arg, $body, $env];
+            [, $param, $body] = $exp;
+            return ['closure', $param, $body, $env];
         }
 
-        // Handle function application
-        $f = $this->evaluate($exp[0], $env);
-        $arg = $this->evaluate($exp[1], $env);
-        
-        // Apply function
-        if (is_callable($f)) {
-            return $f($arg);
-        }
-        
-        if (is_array($f) && $f[0] === 'closure') {
-            [, $param, $body, $closure_env] = $f;
+        // Application
+        if ($exp[0] === 'app') {
+            [, $e1, $e2] = $exp;
+            $closure = $this->evaluate($e1, $env);
+            $arg = $this->evaluate($e2, $env);
+            
+            if (!is_array($closure) || $closure[0] !== 'closure') {
+                throw new \RuntimeException('Cannot apply non-function value');
+            }
+            
+            [, $param, $body, $closure_env] = $closure;
             return $this->evaluate($body, array_merge($closure_env, [$param => $arg]));
         }
-        
-        throw new \RuntimeException('Invalid function application');
+
+        throw new \RuntimeException('Invalid expression type');
     }
 }
