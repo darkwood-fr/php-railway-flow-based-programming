@@ -103,21 +103,26 @@ class LambdaJob implements JobInterface
                 throw new \RuntimeException('Unexpected end of input');
             }
 
-            // Handle lambda abstraction (λx. body)
+            // Handle lambda abstraction (λx.y. body)
             if ($tokens[$position]['type'] === 'lambda') {
                 $position++; // Skip 'λ'
                 $params = [];
 
-                // Collect parameter names
-                while ($position < $length && $tokens[$position]['type'] === 'identifier') {
+                // Collect parameter names separated by dots
+                do {
+                    if ($position >= $length || $tokens[$position]['type'] !== 'identifier') {
+                        throw new \RuntimeException('Expected identifier after lambda or dot');
+                    }
                     $params[] = $tokens[$position]['value'];
                     $position++;
-                }
 
-                if ($position >= $length || $tokens[$position]['type'] !== 'dot') {
-                    throw new \RuntimeException('Expected dot after lambda parameters');
-                }
-                $position++; // Skip '.'
+                    // Check for dot separator
+                    if ($position < $length && $tokens[$position]['type'] === 'dot') {
+                        $position++; // Skip '.'
+                    } else {
+                        break;
+                    }
+                } while ($position < $length);
 
                 // Parse function body
                 $body = $parseExpr();
