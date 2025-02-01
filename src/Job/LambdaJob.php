@@ -98,74 +98,80 @@ class LambdaJob implements JobInterface
         $position = 0;
         $length = count($tokens);
 
-        $parseExpr = function () use (&$position, $tokens, &$parseExpr, $length) {
+        $parseExpr = function () use (&$position, &$tokens, &$parseExpr, $length) {
             if ($position >= $length) {
                 throw new \RuntimeException('Unexpected end of input');
             }
 
-            // Try lambda
+            // Handle lambda abstraction (λx. body)
             if ($tokens[$position]['type'] === 'lambda') {
-                $position++; // skip lambda
-                $vars = [];
-                
-                // Collect all identifiers until we hit a dot
+                $position++; // Skip 'λ'
+                $params = [];
+
+                // Collect parameter names
                 while ($position < $length && $tokens[$position]['type'] === 'identifier') {
-                    $vars[] = $tokens[$position]['value'];
+                    $params[] = $tokens[$position]['value'];
                     $position++;
                 }
-                
+
                 if ($position >= $length || $tokens[$position]['type'] !== 'dot') {
                     throw new \RuntimeException('Expected dot after lambda parameters');
                 }
-                $position++; // skip dot
-                
-                // Parse the body expression
-                $expr = $parseExpr();
-                
-                // Build nested lambda expressions for multiple variables
-                $result = $expr;
-                for ($i = count($vars) - 1; $i >= 0; $i--) {
-                    $result = ['λ', $vars[$i], $result];
+                $position++; // Skip '.'
+
+                // Parse function body
+                $body = $parseExpr();
+
+                // Construct nested lambda expressions
+                foreach (array_reverse($params) as $param) {
+                    $body = ['λ', $param, $body];
                 }
-                return $result;
+
+                return $body;
             }
 
-            // Try application
-            $expr = null;
+            // Handle function application (e.g. (λx. x) (λy. y))
             if ($tokens[$position]['type'] === 'lparen') {
-                $position++; // skip lparen
-                $expr = $parseExpr();
-                
+                $position++; // Skip '('
+                $expressions = [];
+
+                while ($position < $length && $tokens[$position]['type'] !== 'rparen') {
+                    $expressions[] = $parseExpr();
+                }
+
                 if ($position >= $length || $tokens[$position]['type'] !== 'rparen') {
                     throw new \RuntimeException('Expected closing parenthesis');
                 }
-                $position++; // skip rparen
-            } else if ($tokens[$position]['type'] === 'identifier') {
+                $position++; // Skip ')'
+
+                // Handle multiple applications (e.g. (λx. x) (λy. y))
+                $expr = array_shift($expressions);
+                while (!empty($expressions)) {
+                    $expr = [$expr, array_shift($expressions)];
+                }
+
+                return $expr;
+            }
+
+            // Handle identifiers (variables, function names)
+            if ($tokens[$position]['type'] === 'identifier') {
                 $expr = $tokens[$position]['value'];
                 $position++;
-            } else {
-                throw new \RuntimeException(sprintf(
-                    'Unexpected token type "%s"',
-                    $tokens[$position]['type']
-                ));
+                return $expr;
             }
 
-            // Look for application
-            while ($position < $length && 
-                   $position + 1 < $length &&
-                   preg_match('/\s/', $tokens[$position]['value'])) {
-                $position++; // skip space
-                $right = $parseExpr();
-                $expr = [$expr, $right];
-            }
-
-            return $expr;
+            throw new \RuntimeException(sprintf(
+                'Unexpected token type "%s" at position %d',
+                $tokens[$position]['type'],
+                $position
+            ));
         };
 
         $ast = $parseExpr();
 
+        // Ensure all tokens have been consumed
         if ($position < $length) {
-            throw new \RuntimeException('Unexpected tokens after expression');
+            throw new \RuntimeException(sprintf('Unexpected tokens after expression at position %d', $position));
         }
 
         return $ast;
