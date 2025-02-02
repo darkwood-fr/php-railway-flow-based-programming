@@ -19,7 +19,7 @@ class LambdaJob implements JobInterface
     /**
      * @param string|UnicodeString $expression
      */
-    public function __construct(private string|UnicodeString $expression) {}
+    public function __construct(private string|UnicodeString $expression, private Closure|JobInterface $job) {}
 
     public function __invoke($data): mixed
     {
@@ -29,11 +29,10 @@ class LambdaJob implements JobInterface
             
         $tokens = $this->tokenize($expr);
         $ast = $this->parse($tokens);
-        dd($ast);
         $lambda = $this->evaluate($ast);
-        dd($lambda);
+        $job = $this->job;
 
-        return null;
+        return $lambda($job)($data);
     }
 
     private function tokenize(UnicodeString $expression): array {
@@ -159,21 +158,23 @@ class LambdaJob implements JobInterface
         // Lambda abstraction
         if ($exp[0] === 'λ') {
             [, $param, $body] = $exp;
-            return ['closure', $param, $body, $env];
+            // Return a closure that captures the current environment
+            return function($arg) use ($param, $body, $env) {
+                return $this->evaluate($body, array_merge($env, [$param => $arg]));
+            };
         }
 
         // Application
         if ($exp[0] === 'app') {
             [, $e1, $e2] = $exp;
-            $closure = $this->evaluate($e1, $env);
+            $fn = $this->evaluate($e1, $env);
             $arg = $this->evaluate($e2, $env);
             
-            if (!is_array($closure) || $closure[0] !== 'closure') {
+            if (!is_callable($fn)) {
                 throw new \RuntimeException('Cannot apply non-function value');
             }
             
-            [, $param, $body, $closure_env] = $closure;
-            return $this->evaluate($body, array_merge($closure_env, [$param => $arg]));
+            return $fn($arg);
         }
 
         throw new \RuntimeException('Invalid expression type');

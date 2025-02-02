@@ -28,13 +28,23 @@ $driver = match (random_int(3, 3)) {
     // 6 => new ParallelDriver(),
 };
 
+$factorialYJob = static function ($factorial) {
+    return static function (YFlowData $data) use ($factorial): YFlowData {
+        return new YFlowData(
+            $data->id,
+            $data->number,
+            ($data->result <= 1) ? 1 : $data->result * $factorial(new YFlowData($data->id, $data->number, $data->result - 1))->result
+        );
+    };
+};
+
 //$job = new \Flow\Job\LambdaJob('λf.(λx.f (x x)) (λx.f (x x))');
 //$job = new \Flow\Job\LambdaJob('λa.a');
 //$job = new \Flow\Job\LambdaJob('λab.a(b)');
 //$job = new \Flow\Job\LambdaJob('λabcd.a(b(c(d)))');
 
 //$job = new \Flow\Job\LambdaJob('(λy.(λu.y λx.(u u)) ((λx.λu.x (λy.y (x z))) λu.((x x) λu.y)))');
-$job = new \Flow\Job\LambdaJob('(λf.(λx.f (x x)) (λx.f (x x)))');
+$job = new \Flow\Job\LambdaJob('(λf.(λx.f (x x)) (λx.f (x x)))', $factorialYJob);
 
-$result = $job(5);
+$result = $job(new YFlowData(5, 5));
 dd($result);
