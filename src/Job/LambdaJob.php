@@ -6,7 +6,14 @@ namespace Flow\Job;
 
 use Closure;
 use Flow\JobInterface;
+use RuntimeException;
 use Symfony\Component\String\UnicodeString;
+
+use function count;
+use function is_callable;
+use function is_string;
+use function sprintf;
+use function strlen;
 
 /**
  * @template TArgs
@@ -16,17 +23,14 @@ use Symfony\Component\String\UnicodeString;
  */
 class LambdaJob implements JobInterface
 {
-    /**
-     * @param string|UnicodeString $expression
-     */
     public function __construct(private string|UnicodeString $expression, private Closure|JobInterface $job) {}
 
     public function __invoke($data): mixed
     {
-        $expr = $this->expression instanceof UnicodeString 
-            ? $this->expression 
+        $expr = $this->expression instanceof UnicodeString
+            ? $this->expression
             : new UnicodeString($this->expression);
-            
+
         $tokens = $this->tokenize($expr);
         $ast = $this->parse($tokens);
         $lambda = $this->evaluate($ast);
@@ -35,7 +39,8 @@ class LambdaJob implements JobInterface
         return $lambda($job)($data);
     }
 
-    private function tokenize(UnicodeString $expression): array {
+    private function tokenize(UnicodeString $expression): array
+    {
         $tokens = [];
         $position = 0;
         $length = $expression->length();
@@ -44,6 +49,7 @@ class LambdaJob implements JobInterface
             // Skip whitespace
             if (preg_match('/\s/', $expression->slice($position, 1)->toString())) {
                 $position++;
+
                 continue;
             }
 
@@ -51,13 +57,15 @@ class LambdaJob implements JobInterface
             if ($expression->slice($position, 1)->toString() === 'λ') {
                 $tokens[] = ['type' => 'lambda', 'value' => 'λ'];
                 $position++;
+
                 continue;
             }
 
             // Match variables (single letters with optional subscript numbers)
-            if (preg_match('/^([a-z])(\d+)?/i', $expression->slice($position)->toString(), $matches)) {
+            if (preg_match('/^([a-zA-Z0-9]+)/i', $expression->slice($position)->toString(), $matches)) {
                 $tokens[] = ['type' => 'var', 'value' => $matches[0]];
                 $position += strlen($matches[0]);
+
                 continue;
             }
 
@@ -65,14 +73,15 @@ class LambdaJob implements JobInterface
             $symbols = ['.', '(', ')'];
             $types = ['dot', 'lparen', 'rparen'];
             $char = $expression->slice($position, 1)->toString();
-            $index = array_search($char, $symbols);
+            $index = array_search($char, $symbols, true);
             if ($index !== false) {
                 $tokens[] = ['type' => $types[$index], 'value' => $char];
                 $position++;
+
                 continue;
             }
 
-            throw new \RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 'Unexpected character "%s" at position %d',
                 $expression->slice($position, 1)->toString(),
                 $position
@@ -87,9 +96,9 @@ class LambdaJob implements JobInterface
         $position = 0;
         $length = count($tokens);
 
-        $parseExpr = function () use (&$position, &$tokens, &$parseExpr, $length) {
+        $parseExpr = static function () use (&$position, &$tokens, &$parseExpr, $length) {
             if ($position >= $length) {
-                throw new \RuntimeException('Unexpected end of input');
+                throw new RuntimeException('Unexpected end of input');
             }
 
             // Handle variables
@@ -100,36 +109,37 @@ class LambdaJob implements JobInterface
             // Handle lambda abstraction (λx.body)
             if ($tokens[$position]['type'] === 'lambda') {
                 $position++; // Skip 'λ'
-                
+
                 if ($position >= $length || $tokens[$position]['type'] !== 'var') {
-                    throw new \RuntimeException('Expected variable after lambda');
+                    throw new RuntimeException('Expected variable after lambda');
                 }
                 $param = $tokens[$position++]['value'];
-                
+
                 if ($position >= $length || $tokens[$position]['type'] !== 'dot') {
-                    throw new \RuntimeException('Expected dot after parameter');
+                    throw new RuntimeException('Expected dot after parameter');
                 }
                 $position++; // Skip '.'
-                
+
                 $body = $parseExpr();
+
                 return ['λ', $param, $body];
             }
 
-            // Handle application ((e1 e2))
+            // Handle application (e1 e2)
             if ($tokens[$position]['type'] === 'lparen') {
                 $position++; // Skip '('
                 $e1 = $parseExpr();
                 $e2 = $parseExpr();
-                
+
                 if ($position >= $length || $tokens[$position]['type'] !== 'rparen') {
-                    throw new \RuntimeException('Expected closing parenthesis');
+                    throw new RuntimeException('Expected closing parenthesis');
                 }
                 $position++; // Skip ')'
-                
+
                 return ['app', $e1, $e2];
             }
 
-            throw new \RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 'Unexpected token type "%s" at position %d',
                 $tokens[$position]['type'],
                 $position
@@ -139,7 +149,7 @@ class LambdaJob implements JobInterface
         $ast = $parseExpr();
 
         if ($position < $length) {
-            throw new \RuntimeException('Unexpected tokens after expression');
+            throw new RuntimeException('Unexpected tokens after expression');
         }
 
         return $ast;
@@ -150,16 +160,18 @@ class LambdaJob implements JobInterface
         // Variable reference
         if (is_string($exp)) {
             if (!isset($env[$exp])) {
-                throw new \RuntimeException("Unbound variable: $exp");
+                throw new RuntimeException("Unbound variable: {$exp}");
             }
+
             return $env[$exp];
         }
 
         // Lambda abstraction
         if ($exp[0] === 'λ') {
             [, $param, $body] = $exp;
+
             // Return a closure that captures the current environment
-            return function($arg) use ($param, $body, $env) {
+            return function ($arg) use ($param, $body, $env) {
                 return $this->evaluate($body, array_merge($env, [$param => $arg]));
             };
         }
@@ -169,14 +181,14 @@ class LambdaJob implements JobInterface
             [, $e1, $e2] = $exp;
             $fn = $this->evaluate($e1, $env);
             $arg = $this->evaluate($e2, $env);
-            
+
             if (!is_callable($fn)) {
-                throw new \RuntimeException('Cannot apply non-function value');
+                throw new RuntimeException('Cannot apply non-function value');
             }
-            
+
             return $fn($arg);
         }
 
-        throw new \RuntimeException('Invalid expression type');
+        throw new RuntimeException('Invalid expression type');
     }
 }
