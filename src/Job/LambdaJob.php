@@ -128,15 +128,19 @@ class LambdaJob implements JobInterface
             // Handle application (e1 e2)
             if ($tokens[$position]['type'] === 'lparen') {
                 $position++; // Skip '('
-                $e1 = $parseExpr();
-                $e2 = $parseExpr();
+                $expr = $parseExpr();
+
+                // Continue parsing expressions until we find the closing parenthesis
+                while ($position < $length && $tokens[$position]['type'] !== 'rparen') {
+                    $expr = ['app', $expr, $parseExpr()];
+                }
 
                 if ($position >= $length || $tokens[$position]['type'] !== 'rparen') {
                     throw new RuntimeException('Expected closing parenthesis');
                 }
                 $position++; // Skip ')'
 
-                return ['app', $e1, $e2];
+                return $expr;
             }
 
             throw new RuntimeException(sprintf(
