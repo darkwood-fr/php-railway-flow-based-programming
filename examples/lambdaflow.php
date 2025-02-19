@@ -26,10 +26,12 @@ $driver = match (random_int(3, 3)) {
 
 // | A         | Apply         | `SK(SK)`          | `$`     | `λab.ab`                    | `a => b => a(b)`                         | `(a -> b) -> a -> b`                                 | 2           |
 $job = new \Flow\Job\LambdaJob('λa.λb.a(b)');
-$result = $job(fn($x) => $x)(7);
-dd($result);
+$result = $job(fn($a) => $a)(8);
 
 // | B         | Bluebird      | `S(KS)K`          | `.`     | `λabc.a(bc)`                | `a => b => c => a(b(c))`                 | `(a -> b) -> (c -> a) -> c -> b`                     | 3           |
+$job = new \Flow\Job\LambdaJob('λa.λb.λc.a(b c)');
+$result = $job(fn($a) => $a)(fn($b) => $b)(7);
+dd($result);
 
 // | Blackbird | Blackbird     | `BBB`             | `...`   | `λabcd.a(bcd)`              | `a => b => c => => d => a(b(c)(d))`      | `(c -> d) -> (a -> b -> c) -> a -> b -> d`           | 4           |
 

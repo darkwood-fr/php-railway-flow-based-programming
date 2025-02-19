@@ -100,13 +100,9 @@ class LambdaJob implements JobInterface
                 throw new RuntimeException('Unexpected end of input');
             }
 
-            // Handle variables
-            if ($tokens[$position]['type'] === 'var') {
-                return $tokens[$position++]['value'];
-            }
-
             // Handle lambda abstraction 'λx.expr'
             if ($tokens[$position]['type'] === 'lambda') {
+                // dump('lambda');
                 $position++; // Skip 'λ'
 
                 if ($position >= $length || $tokens[$position]['type'] !== 'var') {
@@ -119,34 +115,42 @@ class LambdaJob implements JobInterface
                 }
                 $position++; // Skip '.'
 
-                $expr = $parseExpr();
-
-                return ['λ', $param, $expr];
+                $expr = ['λ', $param, $parseExpr()];
             }
 
-            // Handle application '(expr)'
-            if ($tokens[$position]['type'] === 'lparen') {
-                $position++; // Skip '('
-                $expr = $parseExpr();
+            // Handle variables
+            else if ($tokens[$position]['type'] === 'var') {
+                // dump('var');
+                $expr = $tokens[$position++]['value'];
+            }
 
-                // Continue parsing expressions until we find the closing parenthesis
-                while ($position < $length && $tokens[$position]['type'] !== 'rparen') {
-                    $expr = ['app', $expr, $parseExpr()];
-                }
+            // Handle parens '(expr)'
+            else if ($tokens[$position]['type'] === 'lparen') {
+                // dump('(expr)');
+                $position++; // Skip '('
+
+                $expr = $parseExpr();
 
                 if ($position >= $length || $tokens[$position]['type'] !== 'rparen') {
                     throw new RuntimeException('Expected closing parenthesis');
                 }
                 $position++; // Skip ')'
+            }
 
+            if(empty($expr)) {
+                throw new RuntimeException(sprintf(
+                    'Unexpected token type "%s" at position %d',
+                    $tokens[$position]['type'],
+                    $position
+                ));
+            }
+
+            if ($position >= $length || $tokens[$position]['type'] === 'rparen') {
                 return $expr;
             }
 
-            throw new RuntimeException(sprintf(
-                'Unexpected token type "%s" at position %d',
-                $tokens[$position]['type'],
-                $position
-            ));
+            // Handle application 'expr expr'
+            return ['app', $expr, $parseExpr()];
         };
 
         $ast = $parseExpr();
