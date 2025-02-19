@@ -23,20 +23,19 @@ use function strlen;
  */
 class LambdaJob implements JobInterface
 {
-    public function __construct(private string|UnicodeString $expression, private Closure|JobInterface $job) {}
+    public function __construct(private string|UnicodeString $expression) {}
 
     public function __invoke($data): mixed
     {
-        $expr = $this->expression instanceof UnicodeString
+        $expression = $this->expression instanceof UnicodeString
             ? $this->expression
             : new UnicodeString($this->expression);
 
-        $tokens = $this->tokenize($expr);
+        $tokens = $this->tokenize($expression);
         $ast = $this->parse($tokens);
         $lambda = $this->evaluate($ast);
-        $job = $this->job;
 
-        return $lambda($job)($data);
+        return $lambda($data);
     }
 
     private function tokenize(UnicodeString $expression): array
@@ -61,7 +60,7 @@ class LambdaJob implements JobInterface
                 continue;
             }
 
-            // Match variables (single letters with optional subscript numbers)
+            // Match variables (multiple letters with optional subscript numbers)
             if (preg_match('/^([a-zA-Z0-9]+)/i', $expression->slice($position)->toString(), $matches)) {
                 $tokens[] = ['type' => 'var', 'value' => $matches[0]];
                 $position += strlen($matches[0]);
@@ -165,8 +164,10 @@ class LambdaJob implements JobInterface
         if (is_string($exp)) {
             if (!isset($env[$exp])) {
                 throw new RuntimeException("Unbound variable: {$exp}");
-            }
 
+                // Return a function that will receive the argument later
+                // return fn($arg) => $arg;
+            }
             return $env[$exp];
         }
 
