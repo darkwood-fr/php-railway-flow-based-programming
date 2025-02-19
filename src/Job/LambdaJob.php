@@ -105,7 +105,7 @@ class LambdaJob implements JobInterface
                 return $tokens[$position++]['value'];
             }
 
-            // Handle lambda abstraction (λx.body)
+            // Handle lambda abstraction (λx.expr)
             if ($tokens[$position]['type'] === 'lambda') {
                 $position++; // Skip 'λ'
 
@@ -119,12 +119,12 @@ class LambdaJob implements JobInterface
                 }
                 $position++; // Skip '.'
 
-                $body = $parseExpr();
+                $expr = $parseExpr();
 
-                return ['λ', $param, $body];
+                return ['λ', $param, $expr];
             }
 
-            // Handle application (e1 e2)
+            // Handle application (expr) or (expr1 expr2)
             if ($tokens[$position]['type'] === 'lparen') {
                 $position++; // Skip '('
                 $expr = $parseExpr();
