@@ -25,12 +25,16 @@ $driver = match (random_int(3, 3)) {
 // from https://github.com/loophp/combinator?tab=readme-ov-file#available-combinators
 
 // | A         | Apply         | `SK(SK)`          | `$`     | `λab.ab`                    | `a => b => a(b)`                         | `(a -> b) -> a -> b`                                 | 2           |
-// $job = new \Flow\Job\LambdaJob('λa.λb.a(b)');
-// $result = $job(fn($a) => $a)(8);
+$expression = 'λa.λb.a(b)';
+$job = new \Flow\Job\LambdaJob($expression);
+$result = $job(fn($a) => $a)(8);
+echo "Evaluating " . $expression . " : " . $result . "\n";
 
 // | B         | Bluebird      | `S(KS)K`          | `.`     | `λabc.a(bc)`                | `a => b => c => a(b(c))`                 | `(a -> b) -> (c -> a) -> c -> b`                     | 3           |
-// $job = new \Flow\Job\LambdaJob('λa.λb.λc.a(b c)');
-// $result = $job(fn($a) => $a)(fn($b) => $b)(7);
+$expression = 'λa.λb.λc.a(b c)';
+$job = new \Flow\Job\LambdaJob($expression);
+$result = $job(fn($a) => $a)(fn($b) => $b)(7);
+echo "Evaluating " . $expression . " : " . $result . "\n";
 
 // | Blackbird | Blackbird     | `BBB`             | `...`   | `λabcd.a(bcd)`              | `a => b => c => => d => a(b(c)(d))`      | `(c -> d) -> (a -> b -> c) -> a -> b -> d`           | 4           |
 
@@ -47,19 +51,25 @@ $driver = match (random_int(3, 3)) {
 // | H         | Hummingbird   | `BW(BC)`          |         | `λabc.abcb`                 | `a => b => c => a(b)(c)(b)`              | `(a -> b -> a -> c) -> a -> b -> c`                  | 3           |
 
 // | I         | Idiot         | `SKK`             | `id`    | `λa.a`                      | `a => a`                                 | `a -> a`                                             | 1           |
-// $job = new \Flow\Job\LambdaJob('λa.a');
-// $result = $job(6);
+$expression = 'λa.a';
+$job = new \Flow\Job\LambdaJob($expression);
+$result = $job(6);
+echo "Evaluating " . $expression . " : " . $result . "\n";
 
 // | J         | Jay           | `B(BC)(W(BC(E)))` |         | `λabcd.ab(adc)`             | `a => b => c => d => a(b)(a(d)(c))`      | `(a -> b -> b) -> a -> b -> a -> b`                  | 4           |
 
 
 // | K         | Kestrel       | `K`               | `const` | `λab.a`                     | `a => b => a`                            | `a -> b -> a`                                        | 2           |
-// $job = new \Flow\Job\LambdaJob('λa.λb.a');
-// $result = $job(6)(7);
+$expression = 'λa.λb.a';
+$job = new \Flow\Job\LambdaJob($expression);
+$result = $job(6)(7);
+echo "Evaluating " . $expression . " : " . $result . "\n";
 
 // | Ki        | Kite          | `KI`              |         | `λab.b`                     | `a => b => b`                            | `a -> b -> b`                                        | 2           |
-// $job = new \Flow\Job\LambdaJob('λa.λb.b');
-// $result = $job(6)(7);
+$expression = 'λa.λb.b';
+$job = new \Flow\Job\LambdaJob($expression);
+$result = $job(6)(7);
+echo "Evaluating " . $expression . " : " . $result . "\n";
 
 // | L         | Lark          | `CBM`             |         | `λab.a(bb)`                 | `a => b => a(b(b))`                      |                                                      | 2           |
 
@@ -92,6 +102,7 @@ $driver = match (random_int(3, 3)) {
 // | W         | Warbler       | `C(BMR)`          |         | `λab.abb`                   | `a => b => a(b)(b)`                      | `(a -> a -> b) -> a -> b`                            | 2           |
 
 // | Y         | Y-Fixed point |                   |         | `λa.(λb(a(bb))(λb(a(bb))))` | `a => (b => b(b))(b => a(c => b(b)(c)))` |                                                      | 1           |
+$expression = 'λf.(λx.f (λy.(x x) y)) (λx.f (λy.(x x) y))';
 $factorialYJob = static function ($factorial) {
     return static function (YFlowData $data) use ($factorial): YFlowData {
         return new YFlowData(
@@ -101,9 +112,9 @@ $factorialYJob = static function ($factorial) {
         );
     };
 };
-// $job = new LambdaJob('λf.(λx.f (x x)) (λx.f (x x))');
-$job = new LambdaJob('λf.(λx.f (λy.(x x) y)) (λx.f (λy.(x x) y))');
+$job = new LambdaJob($expression);
 $result = $job($factorialYJob)(new YFlowData(1, 6));
+echo "Evaluating " . $expression . " : " . $result->result . "\n";
 
 // | Z         | Z-Fixed point |                   |         | `λa.M(λb(a(Mb)))`           |                                          |                                                      | 1           |
 
@@ -119,5 +130,3 @@ $result = $job($factorialYJob)(new YFlowData(1, 6));
 // $job = new \Flow\Job\LambdaJob('(λf.(λx.f (x x)) (λx.f (x x)))', $factorialYJob);
 
 // $job = new \Flow\Job\LambdaJob('(λa.(λb.(a (b b))) (λb.(a (b b))))', $factorialYJob);
-
-dd($result);
