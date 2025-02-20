@@ -119,13 +119,13 @@ class LambdaJob implements JobInterface
             }
 
             // Handle variables
-            else if ($tokens[$position]['type'] === 'var') {
+            elseif ($tokens[$position]['type'] === 'var') {
                 // dump('var');
                 $expr = $tokens[$position++]['value'];
             }
 
             // Handle parens '(expr)'
-            else if ($tokens[$position]['type'] === 'lparen') {
+            elseif ($tokens[$position]['type'] === 'lparen') {
                 // dump('(expr)');
                 $position++; // Skip '('
 
@@ -137,7 +137,7 @@ class LambdaJob implements JobInterface
                 $position++; // Skip ')'
             }
 
-            if(empty($expr)) {
+            if (empty($expr)) {
                 throw new RuntimeException(sprintf(
                     'Unexpected token type "%s" at position %d',
                     $tokens[$position]['type'],
@@ -164,15 +164,12 @@ class LambdaJob implements JobInterface
 
     private function evaluate($exp, array $env = []): mixed
     {
-        // Add debug output to trace execution
-        $depth = count(debug_backtrace());
-        $indent = str_repeat('  ', $depth - 1);
-
         // Variable reference
         if (is_string($exp)) {
             if (!isset($env[$exp])) {
                 throw new RuntimeException("Unbound variable: {$exp}");
             }
+
             return $env[$exp];
         }
 
