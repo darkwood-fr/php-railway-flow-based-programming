@@ -97,7 +97,7 @@ $factorialYJob = static function ($factorial) {
         return new YFlowData(
             $data->id,
             $data->number,
-            ($data->result <= 1) ? 1 : $data->result * $factorial(new YFlowData($data->id, $data->number, $data->result - 1))->result
+            ($data->number <= 1) ? 1 : $data->number * $factorial(new YFlowData($data->id, $data->number - 1, $data->result - 1))->result
         );
     };
 };

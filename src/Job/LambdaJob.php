@@ -167,27 +167,21 @@ class LambdaJob implements JobInterface
         // Add debug output to trace execution
         $depth = count(debug_backtrace());
         $indent = str_repeat('  ', $depth - 1);
-        echo $indent . "Evaluating: " . json_encode($exp) . "\n";
-        echo $indent . "Environment: " . json_encode($env) . "\n";
 
         // Variable reference
         if (is_string($exp)) {
             if (!isset($env[$exp])) {
-                echo $indent . "ERROR: Unbound variable: {$exp}\n";
                 throw new RuntimeException("Unbound variable: {$exp}");
             }
-            echo $indent . "Variable lookup: {$exp} = " . json_encode($env[$exp]) . "\n";
             return $env[$exp];
         }
 
         // Lambda abstraction
         if ($exp[0] === 'λ') {
             [, $param, $body] = $exp;
-            echo $indent . "Creating lambda with param: {$param}\n";
 
             // Return a closure that captures the current environment
             return function ($arg) use ($param, $body, $env) {
-                echo str_repeat('  ', count(debug_backtrace()) - 1) . "Applying lambda {$param} with arg: " . json_encode($arg) . "\n";
                 return $this->evaluate($body, array_merge($env, [$param => $arg]));
             };
         }
@@ -195,21 +189,16 @@ class LambdaJob implements JobInterface
         // Application
         if ($exp[0] === 'app') {
             [, $e1, $e2] = $exp;
-            echo $indent . "Evaluating function expression...\n";
             $fn = $this->evaluate($e1, $env);
-            echo $indent . "Evaluating argument expression...\n";
             $arg = $this->evaluate($e2, $env);
 
             if (!is_callable($fn)) {
-                echo $indent . "ERROR: Cannot apply non-function value\n";
                 throw new RuntimeException('Cannot apply non-function value');
             }
 
-            echo $indent . "Applying function to argument...\n";
             return $fn($arg);
         }
 
-        echo $indent . "ERROR: Invalid expression type\n";
         throw new RuntimeException('Invalid expression type');
     }
 }
